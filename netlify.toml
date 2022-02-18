@@ -1,6 +1,8 @@
 [build]
-  publish = "./dist/"
-  command = "npm run build"
+  publish = "dist"
+  command = "export ELM_HOME=\"elm-stuff\" && npm run build"
 
-[build.environment]
-  ELM_HOME = "$NETLIFY_BUILD_BASE/cache/elm"
+[[plugins]]
+package = "netlify-plugin-cache"
+  [plugins.inputs]
+  paths = ["elm-stuff"]
