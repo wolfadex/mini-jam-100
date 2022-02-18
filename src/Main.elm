@@ -337,7 +337,7 @@ view3dScene model =
                                         (Sphere3d.atPoint (Physics.Body.originPoint body) (Length.meters 0.25))
 
                                 ( Player, _ ) ->
-                                    Debug.todo "TODO"
+                                    Scene3d.nothing
                         )
                         (Physics.World.bodies model.physicsWorld)
                 , shadows = True
