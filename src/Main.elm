@@ -2,12 +2,16 @@ module Main exposing (main)
 
 -- import Color.Convert
 
+import Acceleration exposing (Acceleration)
 import Angle
 import Axis3d
+import Block3d exposing (Block3d)
 import Browser exposing (Document)
+import Browser.Events
 import Camera3d
 import Color
 import Direction3d
+import Duration exposing (Duration)
 import Element exposing (..)
 import Element.Background as Background
 import Element.Border as Border
@@ -48,13 +52,54 @@ init : () -> ( Model, Cmd Msg )
 init () =
     ( { physicsWorld =
             Physics.World.empty
+                |> Physics.World.withGravity (Acceleration.metersPerSecondSquared 9.8) Direction3d.negativeZ
                 |> Physics.World.add
                     (Physics.Body.plane
-                        ( Scene3d.quadWithShadow (Scene3d.Material.color Color.green)
+                        ( Scene3d.quadWithShadow (Scene3d.Material.matte Color.green)
                             (Point3d.meters 10 10 0)
                             (Point3d.meters 10 -10 0)
                             (Point3d.meters -10 -10 0)
                             (Point3d.meters -10 10 0)
+                        , False
+                        )
+                    )
+                |> Physics.World.add
+                    (let
+                        block =
+                            Block3d.from (Point3d.meters 10 4 0) (Point3d.meters -10 10 2)
+                     in
+                     Physics.Body.block block
+                        ( Scene3d.blockWithShadow (Scene3d.Material.matte Color.red) block
+                        , False
+                        )
+                    )
+                |> Physics.World.add
+                    (let
+                        block =
+                            Block3d.from (Point3d.meters 10 -10 0) (Point3d.meters -10 -4 2)
+                     in
+                     Physics.Body.block block
+                        ( Scene3d.blockWithShadow (Scene3d.Material.matte Color.red) block
+                        , False
+                        )
+                    )
+                |> Physics.World.add
+                    (let
+                        block =
+                            Block3d.from (Point3d.meters 4 -10 0) (Point3d.meters 10 10 2)
+                     in
+                     Physics.Body.block block
+                        ( Scene3d.blockWithShadow (Scene3d.Material.matte Color.red) block
+                        , False
+                        )
+                    )
+                |> Physics.World.add
+                    (let
+                        block =
+                            Block3d.from (Point3d.meters -4 -10 0) (Point3d.meters -10 10 2)
+                     in
+                     Physics.Body.block block
+                        ( Scene3d.blockWithShadow (Scene3d.Material.matte Color.red) block
                         , False
                         )
                     )
@@ -65,11 +110,14 @@ init () =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Sub.none
+    Sub.batch
+        [ Browser.Events.onAnimationFrameDelta Tick
+        ]
 
 
 type Msg
     = NoOp
+    | Tick Float
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -77,6 +125,16 @@ update msg model =
     case msg of
         NoOp ->
             ( model, Cmd.none )
+
+        Tick deltaMs ->
+            ( { model
+                | physicsWorld =
+                    Physics.World.simulate
+                        (Duration.milliseconds deltaMs)
+                        model.physicsWorld
+              }
+            , Cmd.none
+            )
 
 
 view : Model -> Document Msg
@@ -118,7 +176,7 @@ view3dScene model =
     el [ height fill ]
         (html
             (Scene3d.sunny
-                { background = Scene3d.transparentBackground
+                { background = Scene3d.backgroundColor Color.lightBlue
                 , camera = camera
                 , clipDepth = Length.millimeter
                 , dimensions = ( Pixels.int 800, Pixels.int 600 )
