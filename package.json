@@ -1,0 +1,17 @@
+{
+  "name": "mini-jam-100",
+  "version": "0.1.0",
+  "description": "",
+  "scripts": {
+    "dev": "parcel src/index.html"
+  },
+  "author": "Wolfgang Schuster",
+  "devDependencies": {
+    "@parcel/transformer-elm": "^2.3.1",
+    "elm": "^0.19.1-5",
+    "parcel": "^2.3.1"
+  },
+  "volta": {
+    "node": "16.14.0"
+  }
+}
