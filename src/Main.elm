@@ -24,6 +24,7 @@ import Length exposing (Meters)
 import LineSegment3d
 import Mass
 import Physics.Body
+import Physics.Contact exposing (Contact)
 import Physics.Coordinates exposing (WorldCoordinates)
 import Physics.World exposing (World)
 import Pixels
@@ -50,20 +51,20 @@ type alias Model =
     , ballsToAdd : Int
     , elapsedTime : Float
     , seed : Seed
-    , physicsWorld : World GameShape
+    , physicsWorld : World ( GameShape, Bool )
     }
 
 
 type GameShape
-    = Static (Entity WorldCoordinates)
-    | Ball Color.Color
+    = Static Bool (Entity WorldCoordinates)
+    | Ball Int Color.Color
     | Player
 
 
 init : () -> ( Model, Cmd Msg )
 init () =
     ( { lastBallDrop = 0
-      , ballsToAdd = 50
+      , ballsToAdd = 20
       , elapsedTime = 0
       , seed = Random.initialSeed 0
       , physicsWorld =
@@ -72,13 +73,14 @@ init () =
                 -- Ground
                 |> Physics.World.add
                     (Physics.Body.plane
-                        (Static
+                        ( Static True
                             (Scene3d.quadWithShadow (Scene3d.Material.matte Color.black)
                                 (Point3d.meters 10 10 0)
                                 (Point3d.meters 10 -10 0)
                                 (Point3d.meters -10 -10 0)
                                 (Point3d.meters -10 10 0)
                             )
+                        , True
                         )
                     )
                 -- Raised ground
@@ -88,7 +90,7 @@ init () =
                             Block3d.from (Point3d.meters 10 4 0) (Point3d.meters -4 10 2)
                      in
                      Physics.Body.block block
-                        (Static (Scene3d.blockWithShadow (Scene3d.Material.matte Color.white) block))
+                        ( Static False (Scene3d.blockWithShadow (Scene3d.Material.matte Color.white) block), True )
                     )
                 |> Physics.World.add
                     (let
@@ -96,7 +98,7 @@ init () =
                             Block3d.from (Point3d.meters 4 -10 0) (Point3d.meters -10 -4 2)
                      in
                      Physics.Body.block block
-                        (Static (Scene3d.blockWithShadow (Scene3d.Material.matte Color.white) block))
+                        ( Static False (Scene3d.blockWithShadow (Scene3d.Material.matte Color.white) block), True )
                     )
                 |> Physics.World.add
                     (let
@@ -104,7 +106,7 @@ init () =
                             Block3d.from (Point3d.meters 4 -10 0) (Point3d.meters 10 4 2)
                      in
                      Physics.Body.block block
-                        (Static (Scene3d.blockWithShadow (Scene3d.Material.matte Color.white) block))
+                        ( Static False (Scene3d.blockWithShadow (Scene3d.Material.matte Color.white) block), True )
                     )
                 |> Physics.World.add
                     (let
@@ -112,7 +114,7 @@ init () =
                             Block3d.from (Point3d.meters -4 -4 0) (Point3d.meters -10 10 2)
                      in
                      Physics.Body.block block
-                        (Static (Scene3d.blockWithShadow (Scene3d.Material.matte Color.white) block))
+                        ( Static False (Scene3d.blockWithShadow (Scene3d.Material.matte Color.white) block), True )
                     )
                 -- Barriers
                 |> Physics.World.add
@@ -121,7 +123,7 @@ init () =
                             Block3d.from (Point3d.meters -12 -10 0) (Point3d.meters 12 -12 6)
                      in
                      Physics.Body.block block
-                        (Static (Scene3d.blockWithShadow (Scene3d.Material.matte Color.black) block))
+                        ( Static False (Scene3d.blockWithShadow (Scene3d.Material.matte Color.black) block), True )
                     )
                 |> Physics.World.add
                     (let
@@ -129,7 +131,7 @@ init () =
                             Block3d.from (Point3d.meters -12 10 0) (Point3d.meters 12 12 6)
                      in
                      Physics.Body.block block
-                        (Static (Scene3d.blockWithShadow (Scene3d.Material.matte Color.black) block))
+                        ( Static False (Scene3d.blockWithShadow (Scene3d.Material.matte Color.black) block), True )
                     )
                 |> Physics.World.add
                     (let
@@ -137,7 +139,7 @@ init () =
                             Block3d.from (Point3d.meters 10 12 0) (Point3d.meters 12 -12 6)
                      in
                      Physics.Body.block block
-                        (Static (Scene3d.blockWithShadow (Scene3d.Material.matte Color.black) block))
+                        ( Static False (Scene3d.blockWithShadow (Scene3d.Material.matte Color.black) block), True )
                     )
                 |> Physics.World.add
                     (let
@@ -145,16 +147,16 @@ init () =
                             Block3d.from (Point3d.meters -10 12 0) (Point3d.meters -12 -12 6)
                      in
                      Physics.Body.block block
-                        (Static (Scene3d.blockWithShadow (Scene3d.Material.matte Color.black) block))
+                        ( Static False (Scene3d.blockWithShadow (Scene3d.Material.matte Color.black) block), True )
                     )
                 -- Lip
                 |> Physics.World.add
                     (let
                         block =
-                            Block3d.from (Point3d.meters -4 -4 3.5) (Point3d.meters 4 4 4.1)
+                            Block3d.from (Point3d.meters -3.9 -3.9 3.5) (Point3d.meters 3.9 3.9 4.1)
                      in
                      Physics.Body.block block
-                        (Static (Scene3d.blockWithShadow (Scene3d.Material.matte Color.red) block))
+                        ( Static False (Scene3d.blockWithShadow (Scene3d.Material.matte Color.red) block), True )
                     )
                 -- Spiller
                 |> Physics.World.add
@@ -163,7 +165,7 @@ init () =
                             Sphere3d.atPoint (Point3d.meters 0 0 4.1) (Length.meters 3.9)
                      in
                      Physics.Body.sphere sphere
-                        (Static (Scene3d.sphereWithShadow (Scene3d.Material.matte Color.darkGray) sphere))
+                        ( Static False (Scene3d.sphereWithShadow (Scene3d.Material.matte Color.darkGray) sphere), True )
                     )
       }
     , Cmd.none
@@ -207,7 +209,7 @@ update msg model =
                             | physicsWorld =
                                 model.physicsWorld
                                     |> Physics.World.add
-                                        (Physics.Body.sphere (Sphere3d.atOrigin (Length.meters 0.25)) (Ball config.color)
+                                        (Physics.Body.sphere (Sphere3d.atOrigin (Length.meters 0.25)) ( Ball model.ballsToAdd config.color, True )
                                             |> Physics.Body.moveTo (Point3d.meters config.randomX config.randomY 25)
                                             |> Physics.Body.withBehavior (Physics.Body.dynamic (Mass.kilograms 10))
                                         )
@@ -218,23 +220,62 @@ update msg model =
 
                     else
                         model
+
+                simulatedWorld : World ( GameShape, Bool )
+                simulatedWorld =
+                    Physics.World.simulate (Duration.milliseconds deltaMs) partialModelUpdate.physicsWorld
+
+                contacts : List (Contact ( GameShape, Bool ))
+                contacts =
+                    Physics.World.contacts simulatedWorld
             in
             ( { partialModelUpdate
                 | elapsedTime = model.elapsedTime + deltaMs
-                , physicsWorld = Physics.World.simulate (Duration.milliseconds deltaMs) partialModelUpdate.physicsWorld
+                , physicsWorld =
+                    simulatedWorld
+                        |> Physics.World.update
+                            (\body ->
+                                case Physics.Body.data body of
+                                    ( Ball id color, _ ) ->
+                                        let
+                                            hitFloor =
+                                                List.any
+                                                    (\contact ->
+                                                        let
+                                                            ( left, right ) =
+                                                                Physics.Contact.bodies contact
+                                                        in
+                                                        if body == left then
+                                                            case Physics.Body.data right of
+                                                                ( Static isFloor _, _ ) ->
+                                                                    isFloor
 
-                -- |> Physics.World.update
-                --     (\body ->
-                --         let
-                --             ( entity, isPlayer ) =
-                --                 Physics.Body.data body
-                --             position =
-                --                 Physics.Body.originPoint body
-                --         in
-                --         Physics.Body.withData
-                --             ( Scene3d.translateBy entity, isPlayer )
-                --             body
-                --     )
+                                                                _ ->
+                                                                    False
+
+                                                        else if body == right then
+                                                            case Physics.Body.data left of
+                                                                ( Static isFloor _, _ ) ->
+                                                                    isFloor
+
+                                                                _ ->
+                                                                    False
+
+                                                        else
+                                                            False
+                                                    )
+                                                    contacts
+                                        in
+                                        if hitFloor then
+                                            Physics.Body.withData ( Ball id color, False ) body
+
+                                        else
+                                            body
+
+                                    _ ->
+                                        body
+                            )
+                        |> Physics.World.keepIf (Physics.Body.data >> Tuple.second)
               }
             , Cmd.none
             )
@@ -269,7 +310,7 @@ view3dScene model =
             Camera3d.perspective
                 { viewpoint =
                     Viewpoint3d.lookAt
-                        { eyePoint = Point3d.meters 10 0 40
+                        { eyePoint = Point3d.meters 0 0 40
                         , focalPoint = Point3d.origin
                         , upDirection = Direction3d.positiveZ
                         }
@@ -287,15 +328,15 @@ view3dScene model =
                     List.map
                         (\body ->
                             case Physics.Body.data body of
-                                Static entity ->
+                                ( Static _ entity, _ ) ->
                                     entity
 
-                                Ball color ->
+                                ( Ball _ color, _ ) ->
                                     Scene3d.sphereWithShadow
                                         (Scene3d.Material.matte color)
                                         (Sphere3d.atPoint (Physics.Body.originPoint body) (Length.meters 0.25))
 
-                                Player ->
+                                ( Player, _ ) ->
                                     Debug.todo "TODO"
                         )
                         (Physics.World.bodies model.physicsWorld)
