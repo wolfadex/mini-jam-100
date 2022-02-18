@@ -10,6 +10,7 @@ import Browser exposing (Document)
 import Browser.Events
 import Camera3d
 import Color
+import Color.Manipulate
 import Direction3d
 import Duration exposing (Duration)
 import Element exposing (..)
@@ -50,6 +51,7 @@ type alias Model =
     { lastBallDrop : Float
     , ballsToAdd : Int
     , elapsedTime : Float
+    , floorColor : Color.Color
     , seed : Seed
     , physicsWorld : World ( GameShape, Bool )
     }
@@ -57,6 +59,7 @@ type alias Model =
 
 type GameShape
     = Static Bool (Entity WorldCoordinates)
+    | ColorChanging (Block3d Meters WorldCoordinates)
     | Ball Int Color.Color
     | Player
 
@@ -66,6 +69,7 @@ init () =
     ( { lastBallDrop = 0
       , ballsToAdd = 20
       , elapsedTime = 0
+      , floorColor = Color.white
       , seed = Random.initialSeed 0
       , physicsWorld =
             Physics.World.empty
@@ -90,7 +94,7 @@ init () =
                             Block3d.from (Point3d.meters 10 4 0) (Point3d.meters -4 10 2)
                      in
                      Physics.Body.block block
-                        ( Static False (Scene3d.blockWithShadow (Scene3d.Material.matte Color.white) block), True )
+                        ( ColorChanging block, True )
                     )
                 |> Physics.World.add
                     (let
@@ -98,7 +102,7 @@ init () =
                             Block3d.from (Point3d.meters 4 -10 0) (Point3d.meters -10 -4 2)
                      in
                      Physics.Body.block block
-                        ( Static False (Scene3d.blockWithShadow (Scene3d.Material.matte Color.white) block), True )
+                        ( ColorChanging block, True )
                     )
                 |> Physics.World.add
                     (let
@@ -106,7 +110,7 @@ init () =
                             Block3d.from (Point3d.meters 4 -10 0) (Point3d.meters 10 4 2)
                      in
                      Physics.Body.block block
-                        ( Static False (Scene3d.blockWithShadow (Scene3d.Material.matte Color.white) block), True )
+                        ( ColorChanging block, True )
                     )
                 |> Physics.World.add
                     (let
@@ -114,7 +118,7 @@ init () =
                             Block3d.from (Point3d.meters -4 -4 0) (Point3d.meters -10 10 2)
                      in
                      Physics.Body.block block
-                        ( Static False (Scene3d.blockWithShadow (Scene3d.Material.matte Color.white) block), True )
+                        ( ColorChanging block, True )
                     )
                 -- Barriers
                 |> Physics.World.add
@@ -228,54 +232,72 @@ update msg model =
                 contacts : List (Contact ( GameShape, Bool ))
                 contacts =
                     Physics.World.contacts simulatedWorld
+
+                updatedWorld : World ( GameShape, Bool )
+                updatedWorld =
+                    Physics.World.update
+                        (\body ->
+                            case Physics.Body.data body of
+                                ( Ball id color, _ ) ->
+                                    let
+                                        hitFloor =
+                                            List.any
+                                                (\contact ->
+                                                    let
+                                                        ( left, right ) =
+                                                            Physics.Contact.bodies contact
+                                                    in
+                                                    if body == left then
+                                                        case Physics.Body.data right of
+                                                            ( Static isFloor _, _ ) ->
+                                                                isFloor
+
+                                                            _ ->
+                                                                False
+
+                                                    else if body == right then
+                                                        case Physics.Body.data left of
+                                                            ( Static isFloor _, _ ) ->
+                                                                isFloor
+
+                                                            _ ->
+                                                                False
+
+                                                    else
+                                                        False
+                                                )
+                                                contacts
+                                    in
+                                    if hitFloor then
+                                        Physics.Body.withData ( Ball id color, False ) body
+
+                                    else
+                                        body
+
+                                _ ->
+                                    body
+                        )
+                        simulatedWorld
+
+                mixedColors : Color.Color
+                mixedColors =
+                    List.foldl
+                        (\body result ->
+                            case Physics.Body.data body of
+                                ( Ball _ color, False ) ->
+                                    Color.Manipulate.mix color result
+
+                                _ ->
+                                    result
+                        )
+                        model.floorColor
+                        (Physics.World.bodies updatedWorld)
             in
             ( { partialModelUpdate
                 | elapsedTime = model.elapsedTime + deltaMs
+                , floorColor = mixedColors
                 , physicsWorld =
-                    simulatedWorld
-                        |> Physics.World.update
-                            (\body ->
-                                case Physics.Body.data body of
-                                    ( Ball id color, _ ) ->
-                                        let
-                                            hitFloor =
-                                                List.any
-                                                    (\contact ->
-                                                        let
-                                                            ( left, right ) =
-                                                                Physics.Contact.bodies contact
-                                                        in
-                                                        if body == left then
-                                                            case Physics.Body.data right of
-                                                                ( Static isFloor _, _ ) ->
-                                                                    isFloor
-
-                                                                _ ->
-                                                                    False
-
-                                                        else if body == right then
-                                                            case Physics.Body.data left of
-                                                                ( Static isFloor _, _ ) ->
-                                                                    isFloor
-
-                                                                _ ->
-                                                                    False
-
-                                                        else
-                                                            False
-                                                    )
-                                                    contacts
-                                        in
-                                        if hitFloor then
-                                            Physics.Body.withData ( Ball id color, False ) body
-
-                                        else
-                                            body
-
-                                    _ ->
-                                        body
-                            )
-                        |> Physics.World.keepIf (Physics.Body.data >> Tuple.second)
+                    Physics.World.keepIf (Physics.Body.data >> Tuple.second) updatedWorld
               }
             , Cmd.none
             )
@@ -330,6 +352,9 @@ view3dScene model =
                             case Physics.Body.data body of
                                 ( Static _ entity, _ ) ->
                                     entity
+
+                                ( ColorChanging block, _ ) ->
+                                    Scene3d.blockWithShadow (Scene3d.Material.matte model.floorColor) block
 
                                 ( Ball _ color, _ ) ->
                                     Scene3d.sphereWithShadow
