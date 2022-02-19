@@ -28,6 +28,40 @@
         padding: 0.5rem 1rem;
         border-radius: 1rem;
       }
+
+      .timer {
+        font-family: monospace;
+        font-weight: bold;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 4rem;
+        pointer-events: none;
+        color: white;
+        background-color: rgba(0, 0, 0, 0.75);
+        padding: 0.5rem 1rem;
+        border-radius: 1rem;
+      }
+
+      .game-done {
+        font-family: sans-serif;
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background-color: rgba(0, 0, 0, 0.75);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .game-done button {
+        font-size: 4rem;
+        cursor: pointer;
+        padding: 0.5rem 2rem;
+      }
     </style>
   </head>
   <body>

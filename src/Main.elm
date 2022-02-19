@@ -69,78 +69,7 @@ type GameShape
 
 init : { highScore : Int, initialSeed : Int } -> ( Model, Cmd Msg )
 init { highScore, initialSeed } =
-    ( { lastBallDrop = 0
-      , ballsToAdd = 1
-      , nextBallsToAdd = 2
-      , ballSize = Length.meters 2
-      , ballsCollected = 0
-      , highScore = highScore
-      , elapsedTime = 0
-      , floorColor = Color.white
-      , seed = Random.initialSeed initialSeed
-      , width = Pixels.pixels 0
-      , height = Pixels.pixels 0
-      , physicsWorld =
-            Physics.World.empty
-                |> Physics.World.withGravity (Acceleration.metersPerSecondSquared 9.8) Direction3d.negativeZ
-                -- Ground
-                |> Physics.World.add
-                    (Physics.Body.plane
-                        ( ColorChanging, True )
-                    )
-                -- Barriers
-                |> Physics.World.add
-                    (let
-                        block =
-                            Block3d.from (Point3d.meters -12 -10 0) (Point3d.meters 12 -12 40)
-                     in
-                     Physics.Body.block block
-                        ( Static Scene3d.nothing, True )
-                    )
-                |> Physics.World.add
-                    (let
-                        block =
-                            Block3d.from (Point3d.meters -12 10 0) (Point3d.meters 12 12 40)
-                     in
-                     Physics.Body.block block
-                        ( Static Scene3d.nothing, True )
-                    )
-                |> Physics.World.add
-                    (let
-                        block =
-                            Block3d.from (Point3d.meters 10 12 0) (Point3d.meters 12 -12 40)
-                     in
-                     Physics.Body.block block
-                        ( Static Scene3d.nothing, True )
-                    )
-                |> Physics.World.add
-                    (let
-                        block =
-                            Block3d.from (Point3d.meters -10 12 0) (Point3d.meters -12 -12 40)
-                     in
-                     Physics.Body.block block
-                        ( Static Scene3d.nothing, True )
-                    )
-                |> Physics.World.add
-                    (let
-                        block =
-                            Block3d.from (Point3d.meters -12 -12 40) (Point3d.meters 12 12 41)
-                     in
-                     Physics.Body.block block
-                        ( Static Scene3d.nothing, True )
-                    )
-                -- Spiller
-                |> Physics.World.add
-                    (let
-                        sphere =
-                            Sphere3d.atPoint Point3d.origin (Length.meters 3.9)
-                     in
-                     Physics.Body.sphere sphere
-                        ( Static (Scene3d.sphereWithShadow (Scene3d.Material.matte Color.black) sphere)
-                        , True
-                        )
-                    )
-      }
+    ( initModel highScore (Random.initialSeed initialSeed) (Pixels.pixels 0) (Pixels.pixels 0)
     , Task.perform
         (\{ viewport } ->
             Resize (round viewport.width) (round viewport.height)
@@ -149,12 +78,115 @@ init { highScore, initialSeed } =
     )
 
 
+initModel highScore seed w h =
+    let
+        ( config, nextSeed ) =
+            Random.step
+                (Random.map3 (\x y hue -> { randomX = x, randomY = y, color = Color.hsl hue 1.0 0.5 })
+                    (Random.float -2 2)
+                    (Random.float -2 2)
+                    (Random.float 0 1)
+                )
+                seed
+
+        spawnPoint =
+            Point3d.meters config.randomX config.randomY 15
+    in
+    { lastBallDrop = 0
+    , ballsToAdd = 0
+    , nextBallsToAdd = 2
+    , ballSize = Length.meters 2
+    , ballsCollected = 0
+    , highScore = highScore
+    , elapsedTime = 0
+    , floorColor = Color.white
+    , seed = nextSeed
+    , width = w
+    , height = h
+    , physicsWorld =
+        Physics.World.empty
+            |> Physics.World.withGravity (Acceleration.metersPerSecondSquared 9.8) Direction3d.negativeZ
+            -- Ground
+            |> Physics.World.add
+                (Physics.Body.plane
+                    ( ColorChanging, True )
+                )
+            -- Barriers
+            |> Physics.World.add
+                (let
+                    block =
+                        Block3d.from (Point3d.meters -12 -10 0) (Point3d.meters 12 -12 40)
+                 in
+                 Physics.Body.block block
+                    ( Static Scene3d.nothing, True )
+                )
+            |> Physics.World.add
+                (let
+                    block =
+                        Block3d.from (Point3d.meters -12 10 0) (Point3d.meters 12 12 40)
+                 in
+                 Physics.Body.block block
+                    ( Static Scene3d.nothing, True )
+                )
+            |> Physics.World.add
+                (let
+                    block =
+                        Block3d.from (Point3d.meters 10 12 0) (Point3d.meters 12 -12 40)
+                 in
+                 Physics.Body.block block
+                    ( Static Scene3d.nothing, True )
+                )
+            |> Physics.World.add
+                (let
+                    block =
+                        Block3d.from (Point3d.meters -10 12 0) (Point3d.meters -12 -12 40)
+                 in
+                 Physics.Body.block block
+                    ( Static Scene3d.nothing, True )
+                )
+            |> Physics.World.add
+                (let
+                    block =
+                        Block3d.from (Point3d.meters -12 -12 40) (Point3d.meters 12 12 41)
+                 in
+                 Physics.Body.block block
+                    ( Static Scene3d.nothing, True )
+                )
+            -- Spiller
+            |> Physics.World.add
+                (let
+                    sphere =
+                        Sphere3d.atPoint Point3d.origin (Length.meters 3.9)
+                 in
+                 Physics.Body.sphere sphere
+                    ( Static (Scene3d.sphereWithShadow (Scene3d.Material.matte Color.black) sphere)
+                    , True
+                    )
+                )
+            -- Initial ball
+            |> Physics.World.add
+                (( Ball 0 config.color seed 0, True )
+                    |> Physics.Body.sphere (Sphere3d.atOrigin (Length.meters 2))
+                    |> Physics.Body.moveTo spawnPoint
+                    |> Physics.Body.withBehavior (Physics.Body.dynamic (Mass.kilograms 10))
+                    |> Physics.Body.applyImpulse
+                        (Quantity.times (Duration.seconds 0.05) (Force.newtons 500))
+                        Direction3d.negativeZ
+                        spawnPoint
+                )
+    }
+
+
 subscriptions : Model -> Sub Msg
-subscriptions _ =
-    Sub.batch
-        [ Browser.Events.onAnimationFrameDelta Tick
-        , Browser.Events.onResize Resize
-        ]
+subscriptions model =
+    if remainingTime model < 0 then
+        Browser.Events.onResize Resize
+
+    else
+        Sub.batch
+            [ Browser.Events.onAnimationFrameDelta Tick
+            , Browser.Events.onResize Resize
+            ]
 
 
 port saveScore : Int -> Cmd msg
@@ -164,11 +196,15 @@ type Msg
     = Tick Float
     | Resize Int Int
     | MouseDown (Axis3d Meters WorldCoordinates)
+    | NewGame
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        NewGame ->
+            ( initModel model.highScore model.seed model.width model.height, Cmd.none )
+
         Resize w h ->
             ( { model
                 | width = Pixels.float (toFloat w)
@@ -344,7 +380,7 @@ update msg model =
                     else
                         partialModelUpdate.ballSize
               }
-            , saveScore newBallsCollected
+            , saveScore (max newBallsCollected model.highScore)
             )
 
 
@@ -361,12 +397,33 @@ view model =
             , Html.text ("Collected: " ++ String.fromInt model.ballsCollected)
             ]
         , Html.div
-            [ Html.Attributes.class "title"
-            ]
-            [ Html.text "Click them all!!!"
-            ]
+            [ Html.Attributes.class "title" ]
+            [ Html.text "Click them all!!!" ]
+        , if remainingTime model < 0 then
+            Html.div
+                [ Html.Attributes.class "game-done" ]
+                [ Html.button
+                    [ Html.Events.onClick NewGame
+                    ]
+                    [ Html.text "New Game" ]
+                ]
+
+          else
+            Html.div
+                [ Html.Attributes.class "timer" ]
+                [ Html.text (String.fromInt (remainingTime model)) ]
         ]
     }
+
+
+timeLimit : Float
+timeLimit =
+    31000
+
+
+remainingTime : Model -> Int
+remainingTime model =
+    round ((timeLimit - model.elapsedTime) / 1000)
 
 
 camera : Camera3d Meters WorldCoordinates
