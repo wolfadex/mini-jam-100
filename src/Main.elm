@@ -35,7 +35,7 @@ import Task
 import Viewpoint3d
 
 
-main : Program Int Model Msg
+main : Program { highScore : Int, initialSeed : Int } Model Msg
 main =
     Browser.document
         { init = init
@@ -67,8 +67,8 @@ type GameShape
     | Ball Int Color.Color Seed Float
 
 
-init : Int -> ( Model, Cmd Msg )
-init highScore =
+init : { highScore : Int, initialSeed : Int } -> ( Model, Cmd Msg )
+init { highScore, initialSeed } =
     ( { lastBallDrop = 0
       , ballsToAdd = 1
       , nextBallsToAdd = 2
@@ -77,7 +77,7 @@ init highScore =
       , highScore = highScore
       , elapsedTime = 0
       , floorColor = Color.white
-      , seed = Random.initialSeed 0
+      , seed = Random.initialSeed initialSeed
       , width = Pixels.pixels 0
       , height = Pixels.pixels 0
       , physicsWorld =
